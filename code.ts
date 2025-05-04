@@ -5,13 +5,26 @@ figma.ui.onmessage = async (msg) => {
     try {
       const collections = await figma.variables.getLocalVariableCollectionsAsync();
       const targetCollections = collections.filter(c => 
-        ["Main color", "Semantic", "Support color"].indexOf(c.name) !== -1
+        ["Main color", "Semantic", "Support color", "Size", "Theme"].indexOf(c.name) !== -1
       );
 
       let output = 'Collections funnet:\n';
       targetCollections.forEach(c => {
         output += `- ${c.name}\n`;
       });
+
+      // Sjekk for manglende collections
+      const requiredCollections = ["Main color", "Semantic", "Support color", "Size", "Theme"];
+      const missingCollections = requiredCollections.filter(name => 
+        !collections.some(c => c.name === name)
+      );
+
+      if (missingCollections.length > 0) {
+        output += '\nAdvarsel: Følgende collections mangler:\n';
+        missingCollections.forEach(name => {
+          output += `- ${name}\n`;
+        });
+      }
 
       if (targetCollections.length === 0) {
         output += '\nIngen collections funnet med navn "Main color", "Semantic" eller "Support color".';
@@ -55,25 +68,51 @@ figma.ui.onmessage = async (msg) => {
             variable.setVariableCodeSyntax('WEB', codeSyntax);
             updatedCount++;
           } else if (variable.resolvedType === 'FLOAT') {
-            // Tall (f.eks. size, border-radius, border-width, opacity)
+            // Tall (f.eks. size, border-radius, border-width, opacity, font-size)
             const fullName = variable.name.toLowerCase();
             const name = variable.name.split('/').pop()?.replace(/\s+/g, '-').toLowerCase() || '';
             
-            // Bestem riktig prefiks basert på hele navnet
-            let prefix = '--ds-';
-            if (fullName.includes('size')) {
-              prefix += 'size-';
-            } else if (fullName.includes('border-radius')) {
-              prefix += 'border-radius-';
-            } else if (fullName.includes('border-width')) {
-              prefix += 'border-width-';
-            } else if (fullName.includes('opacity')) {
-              prefix += 'opacity-';
-            } else {
-              prefix += collection.name.toLowerCase() + '-';
+            // Ignorer variabler som starter med _size
+            if (fullName.startsWith('_size/')) {
+              continue;
             }
             
-            const codeSyntax = `${prefix}${name}`;
+            let codeSyntax = '';
+            
+            // Bestem riktig prefiks basert på hele navnet
+            if (fullName.includes('font-size/')) {
+              codeSyntax = `--ds-font-size-${name}`;
+            } else if (fullName.includes('border-radius')) {
+              codeSyntax = `--ds-border-radius-${name}`;
+            } else if (fullName.includes('border-width')) {
+              codeSyntax = `--ds-border-width-${name}`;
+            } else if (fullName.includes('opacity')) {
+              codeSyntax = `--ds-opacity-${name}`;
+            } else {
+              codeSyntax = `--ds-${collection.name.toLowerCase()}-${name}`;
+            }
+            
+            // Oppdater variabelen med ny code syntax
+            variable.setVariableCodeSyntax('WEB', codeSyntax);
+            updatedCount++;
+          } else if (variable.resolvedType === 'STRING') {
+            // String (f.eks. font-family, font-weight)
+            const fullName = variable.name.toLowerCase();
+            const name = variable.name.split('/').pop()?.replace(/\s+/g, '-').toLowerCase() || '';
+            
+            let codeSyntax = '';
+            
+            // Spesialhåndtering for Theme collection
+            if (collection.name === 'Theme') {
+              if (fullName.includes('font-weight/')) {
+                codeSyntax = `--ds-font-weight-${name}`;
+              } else if (fullName === 'font-family') {
+                codeSyntax = '--ds-font-family';
+              } else {
+                // Ignorer andre variabler i Theme collection
+                continue;
+              }
+            }
             
             // Oppdater variabelen med ny code syntax
             variable.setVariableCodeSyntax('WEB', codeSyntax);
