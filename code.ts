@@ -1,37 +1,99 @@
-// This plugin will open a window to prompt the user to enter a number, and
-// it will then create that many rectangles on the screen.
+figma.showUI(__html__, { width: 400, height: 400 });
 
-// This file holds the main code for plugins. Code in this file has access to
-// the *figma document* via the figma global object.
-// You can access browser APIs in the <script> tag inside "ui.html" which has a
-// full browser environment (See https://www.figma.com/plugin-docs/how-plugins-run).
+figma.ui.onmessage = async (msg) => {
+  if (msg.type === 'generate-css') {
+    try {
+      const collections = await figma.variables.getLocalVariableCollectionsAsync();
+      const targetCollections = collections.filter(c => 
+        ["Main color", "Semantic", "Support color"].indexOf(c.name) !== -1
+      );
 
-// This shows the HTML page in "ui.html".
-figma.showUI(__html__);
+      let output = 'Collections funnet:\n';
+      targetCollections.forEach(c => {
+        output += `- ${c.name}\n`;
+      });
 
-// Calls to "parent.postMessage" from within the HTML page will trigger this
-// callback. The callback will be passed the "pluginMessage" property of the
-// posted message.
-figma.ui.onmessage =  (msg: {type: string, count: number}) => {
-  // One way of distinguishing between different types of messages sent from
-  // your HTML page is to use an object with a "type" property like this.
-  if (msg.type === 'create-shapes') {
-    // This plugin creates rectangles on the screen.
-    const numberOfRectangles = msg.count;
+      if (targetCollections.length === 0) {
+        output += '\nIngen collections funnet med navn "Main color", "Semantic" eller "Support color".';
+        figma.ui.postMessage({
+          type: 'css-output',
+          css: output
+        });
+        return;
+      }
 
-    const nodes: SceneNode[] = [];
-    for (let i = 0; i < numberOfRectangles; i++) {
-      const rect = figma.createRectangle();
-      rect.x = i * 150;
-      rect.fills = [{ type: 'SOLID', color: { r: 1, g: 0.5, b: 0 } }];
-      figma.currentPage.appendChild(rect);
-      nodes.push(rect);
+      let updatedCount = 0;
+
+      for (const collection of targetCollections) {
+        const allVariables = await figma.variables.getLocalVariablesAsync();
+        const variables = allVariables.filter(v => 
+          v.variableCollectionId === collection.id
+        );
+
+        for (const variable of variables) {
+          const value = variable.valuesByMode[Object.keys(variable.valuesByMode)[0]];
+          
+          if (variable.resolvedType === 'COLOR') {
+            // Farge
+            const fullName = variable.name.toLowerCase();
+            const name = variable.name.split('/').pop()?.replace(/\s+/g, '-').toLowerCase() || '';
+            
+            // Spesialhåndtering for fokus og link farger
+            let codeSyntax = '';
+            if (fullName === 'link/color/visited') {
+              codeSyntax = '--ds-link-color-visited';
+            } else if (fullName.includes('focus/inner')) {
+              codeSyntax = '--ds-color-focus-inner';
+            } else if (fullName.includes('focus/outer')) {
+              codeSyntax = '--ds-color-focus-outer';
+            } else {
+              // Standard fargehåndtering
+              codeSyntax = `--ds-color-${name}`;
+            }
+            
+            // Oppdater variabelen med ny code syntax
+            variable.setVariableCodeSyntax('WEB', codeSyntax);
+            updatedCount++;
+          } else if (variable.resolvedType === 'FLOAT') {
+            // Tall (f.eks. size, border-radius, border-width, opacity)
+            const fullName = variable.name.toLowerCase();
+            const name = variable.name.split('/').pop()?.replace(/\s+/g, '-').toLowerCase() || '';
+            
+            // Bestem riktig prefiks basert på hele navnet
+            let prefix = '--ds-';
+            if (fullName.includes('size')) {
+              prefix += 'size-';
+            } else if (fullName.includes('border-radius')) {
+              prefix += 'border-radius-';
+            } else if (fullName.includes('border-width')) {
+              prefix += 'border-width-';
+            } else if (fullName.includes('opacity')) {
+              prefix += 'opacity-';
+            } else {
+              prefix += collection.name.toLowerCase() + '-';
+            }
+            
+            const codeSyntax = `${prefix}${name}`;
+            
+            // Oppdater variabelen med ny code syntax
+            variable.setVariableCodeSyntax('WEB', codeSyntax);
+            updatedCount++;
+          }
+        }
+      }
+
+      output += `\nOppdaterte ${updatedCount} variabler med ny code syntax.`;
+
+      figma.ui.postMessage({
+        type: 'css-output',
+        css: output
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Ukjent feil';
+      figma.ui.postMessage({
+        type: 'css-output',
+        css: `Feil: ${errorMessage}`
+      });
     }
-    figma.currentPage.selection = nodes;
-    figma.viewport.scrollAndZoomIntoView(nodes);
   }
-
-  // Make sure to close the plugin when you're done. Otherwise the plugin will
-  // keep running, which shows the cancel button at the bottom of the screen.
-  figma.closePlugin();
-};
+}; 
