@@ -88,6 +88,8 @@ figma.ui.onmessage = async (msg) => {
               codeSyntax = `--ds-border-width-${name}`;
             } else if (fullName.includes('opacity')) {
               codeSyntax = `--ds-opacity-${name}`;
+            } else if (fullName.includes('size/')) {
+              codeSyntax = `--ds-size-${name}`;
             } else {
               codeSyntax = `--ds-${collection.name.toLowerCase()}-${name}`;
             }
