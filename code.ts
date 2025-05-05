@@ -4,54 +4,50 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type === 'generate-css') {
     try {
       const collections = await figma.variables.getLocalVariableCollectionsAsync();
+      const requiredCollections = ["Main color", "Semantic", "Support color", "Size", "Theme"];
       const targetCollections = collections.filter(c => 
-        ["Main color", "Semantic", "Support color", "Size", "Theme"].indexOf(c.name) !== -1
+        requiredCollections.some(name => name === c.name)
       );
 
       let output = 'Collections funnet:\n';
-      targetCollections.forEach(c => {
-        output += `- ${c.name}\n`;
-      });
+      targetCollections.forEach(c => output += `- ${c.name}\n`);
 
       // Sjekk for manglende collections
-      const requiredCollections = ["Main color", "Semantic", "Support color", "Size", "Theme"];
       const missingCollections = requiredCollections.filter(name => 
         !collections.some(c => c.name === name)
       );
 
       if (missingCollections.length > 0) {
         output += '\nAdvarsel: Følgende collections mangler:\n';
-        missingCollections.forEach(name => {
-          output += `- ${name}\n`;
-        });
+        missingCollections.forEach(name => output += `- ${name}\n`);
       }
 
       if (targetCollections.length === 0) {
-        output += '\nIngen collections funnet med navn "Main color", "Semantic" eller "Support color".';
-        figma.ui.postMessage({
-          type: 'css-output',
-          css: output
-        });
+        output += '\nIngen relevante collections funnet.';
+        figma.ui.postMessage({ type: 'css-output', css: output });
         return;
       }
 
       let updatedCount = 0;
+      
+      // Hent alle variabler én gang
+      const allVariables = await figma.variables.getLocalVariablesAsync();
+
+      // Hjelpefunksjon for å hente formatert navn
+      function getFormattedName(variable: Variable) {
+        const fullName = variable.name.toLowerCase();
+        const name = variable.name.split('/').pop()?.replace(/\s+/g, '-').toLowerCase() || '';
+        return { fullName, name };
+      }
 
       for (const collection of targetCollections) {
-        const allVariables = await figma.variables.getLocalVariablesAsync();
-        const variables = allVariables.filter(v => 
-          v.variableCollectionId === collection.id
-        );
+        const variables = allVariables.filter(v => v.variableCollectionId === collection.id);
 
         for (const variable of variables) {
-          const value = variable.valuesByMode[Object.keys(variable.valuesByMode)[0]];
+          const { fullName, name } = getFormattedName(variable);
           
-          if (variable.resolvedType === 'COLOR') {
-            // Farge
-            const fullName = variable.name.toLowerCase();
-            const name = variable.name.split('/').pop()?.replace(/\s+/g, '-').toLowerCase() || '';
-            
-            // Spesialhåndtering for fokus og link farger
+          // Håndterer fargevariabler i alle collections UNNTATT Theme
+          if (variable.resolvedType === 'COLOR' && collection.name !== 'Theme') {
             let codeSyntax = '';
             if (fullName === 'link/color/visited') {
               codeSyntax = '--ds-link-color-visited';
@@ -60,26 +56,17 @@ figma.ui.onmessage = async (msg) => {
             } else if (fullName.includes('focus/outer')) {
               codeSyntax = '--ds-color-focus-outer';
             } else {
-              // Standard fargehåndtering
               codeSyntax = `--ds-color-${name}`;
             }
             
-            // Oppdater variabelen med ny code syntax
             variable.setVariableCodeSyntax('WEB', codeSyntax);
             updatedCount++;
-          } else if (variable.resolvedType === 'FLOAT') {
-            // Tall (f.eks. size, border-radius, border-width, opacity, font-size)
-            const fullName = variable.name.toLowerCase();
-            const name = variable.name.split('/').pop()?.replace(/\s+/g, '-').toLowerCase() || '';
-            
-            // Ignorer variabler som starter med _size
-            if (fullName.startsWith('_size/')) {
-              continue;
-            }
+          } 
+          // Håndterer tallvariabler (size, border-radius, etc.) i alle collections UNNTATT Theme
+          else if (variable.resolvedType === 'FLOAT' && collection.name !== 'Theme') {
+            if (fullName.startsWith('_size/')) continue;
             
             let codeSyntax = '';
-            
-            // Bestem riktig prefiks basert på hele navnet
             if (fullName.includes('font-size/')) {
               codeSyntax = `--ds-font-size-${name}`;
             } else if (fullName.includes('border-radius')) {
@@ -94,31 +81,22 @@ figma.ui.onmessage = async (msg) => {
               codeSyntax = `--ds-${collection.name.toLowerCase()}-${name}`;
             }
             
-            // Oppdater variabelen med ny code syntax
             variable.setVariableCodeSyntax('WEB', codeSyntax);
             updatedCount++;
-          } else if (variable.resolvedType === 'STRING') {
-            // String (f.eks. font-family, font-weight)
-            const fullName = variable.name.toLowerCase();
-            const name = variable.name.split('/').pop()?.replace(/\s+/g, '-').toLowerCase() || '';
-            
+          } 
+          // Håndterer KUN STRING-variabler i Theme collection
+          else if (collection.name === 'Theme' && variable.resolvedType === 'STRING') {
             let codeSyntax = '';
-            
-            // Spesialhåndtering for Theme collection
-            if (collection.name === 'Theme') {
-              if (fullName.includes('font-weight/')) {
-                codeSyntax = `--ds-font-weight-${name}`;
-              } else if (fullName === 'font-family') {
-                codeSyntax = '--ds-font-family';
-              } else {
-                // Ignorer andre variabler i Theme collection
-                continue;
-              }
+            if (fullName.includes('font-weight/')) {
+              codeSyntax = `--ds-font-weight-${name}`;
+            } else if (fullName === 'font-family') {
+              codeSyntax = '--ds-font-family';
             }
             
-            // Oppdater variabelen med ny code syntax
-            variable.setVariableCodeSyntax('WEB', codeSyntax);
-            updatedCount++;
+            if (codeSyntax) {
+              variable.setVariableCodeSyntax('WEB', codeSyntax);
+              updatedCount++;
+            }
           }
         }
       }
@@ -137,4 +115,4 @@ figma.ui.onmessage = async (msg) => {
       });
     }
   }
-}; 
+};
