@@ -33,6 +33,9 @@ figma.ui.onmessage = async (msg) => {
       // Hent alle variabler én gang
       const allVariables = await figma.variables.getLocalVariablesAsync();
 
+      // Map for å holde styr på unike syntax-typer
+      const uniqueSyntaxTypes = new Map<string, string>();
+
       // Hjelpefunksjon for å hente formatert navn
       function getFormattedName(variable: Variable) {
         const fullName = variable.name.toLowerCase();
@@ -60,6 +63,7 @@ figma.ui.onmessage = async (msg) => {
             }
             
             variable.setVariableCodeSyntax('WEB', codeSyntax);
+            uniqueSyntaxTypes.set('COLOR', codeSyntax);
             updatedCount++;
           } 
           // Håndterer tallvariabler (size, border-radius, etc.) i alle collections UNNTATT Theme
@@ -69,16 +73,22 @@ figma.ui.onmessage = async (msg) => {
             let codeSyntax = '';
             if (fullName.includes('font-size/')) {
               codeSyntax = `--ds-font-size-${name}`;
+              uniqueSyntaxTypes.set('FONT_SIZE', codeSyntax);
             } else if (fullName.includes('border-radius')) {
               codeSyntax = `--ds-border-radius-${name}`;
+              uniqueSyntaxTypes.set('BORDER_RADIUS', codeSyntax);
             } else if (fullName.includes('border-width')) {
               codeSyntax = `--ds-border-width-${name}`;
+              uniqueSyntaxTypes.set('BORDER_WIDTH', codeSyntax);
             } else if (fullName.includes('opacity')) {
               codeSyntax = `--ds-opacity-${name}`;
+              uniqueSyntaxTypes.set('OPACITY', codeSyntax);
             } else if (fullName.includes('size/')) {
               codeSyntax = `--ds-size-${name}`;
+              uniqueSyntaxTypes.set('SIZE', codeSyntax);
             } else {
               codeSyntax = `--ds-${collection.name.toLowerCase()}-${name}`;
+              uniqueSyntaxTypes.set('OTHER_FLOAT', codeSyntax);
             }
             
             variable.setVariableCodeSyntax('WEB', codeSyntax);
@@ -89,8 +99,10 @@ figma.ui.onmessage = async (msg) => {
             let codeSyntax = '';
             if (fullName.includes('font-weight/')) {
               codeSyntax = `--ds-font-weight-${name}`;
+              uniqueSyntaxTypes.set('FONT_WEIGHT', codeSyntax);
             } else if (fullName === 'font-family') {
               codeSyntax = '--ds-font-family';
+              uniqueSyntaxTypes.set('FONT_FAMILY', codeSyntax);
             }
             
             if (codeSyntax) {
@@ -100,6 +112,12 @@ figma.ui.onmessage = async (msg) => {
           }
         }
       }
+
+      // Legg til oversikt over unike syntax-typer i output
+      output += '\n\nOversikt over syntax-typer:\n';
+      uniqueSyntaxTypes.forEach((syntax, type) => {
+        output += `${type}: ${syntax}\n`;
+      });
 
       output += `\nOppdaterte ${updatedCount} variabler med ny code syntax.`;
 
