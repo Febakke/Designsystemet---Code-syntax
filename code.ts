@@ -114,12 +114,12 @@ figma.ui.onmessage = async (msg) => {
       }
 
       // Legg til oversikt over unike syntax-typer i output
-      output += '\n\nOversikt over syntax-typer:\n';
-      uniqueSyntaxTypes.forEach((syntax, type) => {
-        output += `${type}: ${syntax}\n`;
-      });
+     //  output += '\n\nOversikt over syntax-typer:\n';
+      //uniqueSyntaxTypes.forEach((syntax, type) => {
+      //  output += `${type}: ${syntax}\n`;
+      //});
 
-      output += `\nOppdaterte ${updatedCount} variabler med ny code syntax.`;
+      output += `\nOppdaterte ${updatedCount} variabler med designsystemets CSS syntax.`;
 
       figma.ui.postMessage({
         type: 'css-output',
