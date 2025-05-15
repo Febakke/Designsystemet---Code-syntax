@@ -53,13 +53,13 @@ figma.ui.onmessage = async (msg) => {
           if (variable.resolvedType === 'COLOR' && collection.name !== 'Theme') {
             let codeSyntax = '';
             if (fullName === 'link/color/visited') {
-              codeSyntax = '--ds-link-color-visited';
+              codeSyntax = 'var(--ds-link-color-visited)';
             } else if (fullName.includes('focus/inner')) {
-              codeSyntax = '--ds-color-focus-inner';
+              codeSyntax = 'var(--ds-color-focus-inner)';
             } else if (fullName.includes('focus/outer')) {
-              codeSyntax = '--ds-color-focus-outer';
+              codeSyntax = 'var(--ds-color-focus-outer)';
             } else {
-              codeSyntax = `--ds-color-${name}`;
+              codeSyntax = `var(--ds-color-${name})`;
             }
             
             variable.setVariableCodeSyntax('WEB', codeSyntax);
@@ -72,22 +72,22 @@ figma.ui.onmessage = async (msg) => {
             
             let codeSyntax = '';
             if (fullName.includes('font-size/')) {
-              codeSyntax = `--ds-font-size-${name}`;
+              codeSyntax = `var(--ds-font-size-${name})`;
               uniqueSyntaxTypes.set('FONT_SIZE', codeSyntax);
             } else if (fullName.includes('border-radius')) {
-              codeSyntax = `--ds-border-radius-${name}`;
+              codeSyntax = `var(--ds-border-radius-${name})`;
               uniqueSyntaxTypes.set('BORDER_RADIUS', codeSyntax);
             } else if (fullName.includes('border-width')) {
-              codeSyntax = `--ds-border-width-${name}`;
+              codeSyntax = `var(--ds-border-width-${name})`;
               uniqueSyntaxTypes.set('BORDER_WIDTH', codeSyntax);
             } else if (fullName.includes('opacity')) {
-              codeSyntax = `--ds-opacity-${name}`;
+              codeSyntax = `var(--ds-opacity-${name})`;
               uniqueSyntaxTypes.set('OPACITY', codeSyntax);
             } else if (fullName.includes('size/')) {
-              codeSyntax = `--ds-size-${name}`;
+              codeSyntax = `var(--ds-size-${name})`;
               uniqueSyntaxTypes.set('SIZE', codeSyntax);
             } else {
-              codeSyntax = `--ds-${collection.name.toLowerCase()}-${name}`;
+              codeSyntax = `var(--ds-${collection.name.toLowerCase()}-${name})`;
               uniqueSyntaxTypes.set('OTHER_FLOAT', codeSyntax);
             }
             
@@ -98,10 +98,10 @@ figma.ui.onmessage = async (msg) => {
           else if (collection.name === 'Theme' && variable.resolvedType === 'STRING') {
             let codeSyntax = '';
             if (fullName.includes('font-weight/')) {
-              codeSyntax = `--ds-font-weight-${name}`;
+              codeSyntax = `var(--ds-font-weight-${name})`;
               uniqueSyntaxTypes.set('FONT_WEIGHT', codeSyntax);
             } else if (fullName === 'font-family') {
-              codeSyntax = '--ds-font-family';
+              codeSyntax = 'var(--ds-font-family)';
               uniqueSyntaxTypes.set('FONT_FAMILY', codeSyntax);
             }
             
