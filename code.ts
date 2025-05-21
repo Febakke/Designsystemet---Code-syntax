@@ -58,7 +58,13 @@ figma.ui.onmessage = async (msg) => {
               codeSyntax = 'var(--ds-color-focus-inner)';
             } else if (fullName.includes('focus/outer')) {
               codeSyntax = 'var(--ds-color-focus-outer)';
+            } else if (collection.name === 'Semantic') {
+              // For Semantic collection, inkluder fargenavnet i variabelnavnet
+              const [, colorName, ...rest] = fullName.split('/');
+              const restOfName = rest.join('-');
+              codeSyntax = `var(--ds-color-${colorName}-${restOfName})`;
             } else {
+              // For Main color og Support color, behold eksisterende oppførsel
               codeSyntax = `var(--ds-color-${name})`;
             }
             
