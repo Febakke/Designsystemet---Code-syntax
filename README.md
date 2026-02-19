@@ -18,14 +18,14 @@ Pluginen har to handlinger:
 
 ## Collections
 
-### Syntax (kun disse)
+### Syntax
 - `Main color`
 - `Semantic`
 - `Support color`
 - `Size`
 - `Theme`
 
-### Scopes (disse + ekstra)
+### Scopes
 - `Main color`
 - `Semantic`
 - `Support color`
@@ -53,11 +53,6 @@ Pluginen har to handlinger:
 ### String
 - `Theme` + `font-weight/*` -> `FONT_STYLE`
 - `Theme` + `font-family` -> `FONT_FAMILY`
-
-## UI
-- To knapper: `Generer CSS-syntax` og `Sett scopes`
-- Loader/status under kjøring
-- Bruker Figma sine UI CSS variables (`themeColors: true`)
 
 ## Viktig
 - Pluginen er laget for vår navnekonvensjon og token-struktur.
