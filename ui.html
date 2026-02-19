@@ -224,8 +224,8 @@
       if (canSwitch) {
         const toWith = health.semanticDetected === 'without';
         switchButton.textContent = toWith
-          ? 'Switch Semantic to WITH Color Name'
-          : 'Switch Semantic to WITHOUT Color Name';
+          ? 'Add Color name to semantic colors'
+          : 'Remove color name from semantic colors';
         switchButton.onclick = () => {
           parent.postMessage({ pluginMessage: { type: 'generate-syntax', useSemanticColorName: toWith } }, '*');
           setBusy(true);

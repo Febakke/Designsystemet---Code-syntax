@@ -10,7 +10,7 @@ UI then shows:
 - Status tags for `Scopes`, `Syntax`, and `Semantic` mode.
 - `Fix Scopes` button only when scope issues exist.
 - `Fix CSS Syntax` button only when syntax issues exist.
-- `Switch Semantic ...` button only when syntax is already correct and semantic mode can be detected.
+- Semantic switch button only when syntax is already correct and semantic mode can be detected.
 
 ## UI Text Reference
 
@@ -31,9 +31,12 @@ Sets `variable.scopes` according to the rules below.
 Sets `variable.setVariableCodeSyntax('WEB', ...)`.
 Default behavior is **without color name** in `Semantic`.
 
-### `Switch Semantic to WITH/WITHOUT Color Name`
+### Semantic switch
 Available only when syntax is currently valid.
 Applies syntax in the opposite semantic variant.
+UI labels:
+- `Add Color name to semantic`
+- `Remove color name from semantic`
 
 ## Collections Used
 
