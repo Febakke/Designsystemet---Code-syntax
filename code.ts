@@ -1,8 +1,9 @@
-figma.showUI(__html__, { width: 400, height: 400 });
+figma.showUI(__html__, { themeColors: true, width: 400, height: 400 });
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === 'generate-css') {
     try {
+      const useSemanticColorName = Boolean(msg.useSemanticColorName);
       const collections = await figma.variables.getLocalVariableCollectionsAsync();
       const requiredCollections = ["Main color", "Semantic", "Support color", "Size", "Theme"];
       const targetCollections = collections.filter(c => 
@@ -59,10 +60,13 @@ figma.ui.onmessage = async (msg) => {
             } else if (fullName.includes('focus/outer')) {
               codeSyntax = 'var(--ds-color-focus-outer)';
             } else if (collection.name === 'Semantic') {
-              // For Semantic collection, inkluder fargenavnet i variabelnavnet
+              // For Semantic collection, include color name only when toggled on.
               const [, colorName, ...rest] = fullName.split('/');
-              const restOfName = rest.join('-');
-              codeSyntax = `var(--ds-color-${colorName}-${restOfName})`;
+              const semanticParts = useSemanticColorName
+                ? [colorName, ...rest].filter(Boolean)
+                : rest.filter(Boolean);
+              const semanticName = semanticParts.join('-') || name;
+              codeSyntax = `var(--ds-color-${semanticName})`;
             } else {
               // For Main color og Support color, behold eksisterende oppførsel
               codeSyntax = `var(--ds-color-${name})`;
@@ -126,6 +130,7 @@ figma.ui.onmessage = async (msg) => {
       //});
 
       output += `\nOppdaterte ${updatedCount} variabler med designsystemets CSS syntax.`;
+      output += `\nSemantic ble generert ${useSemanticColorName ? 'med fargenavn' : 'uten fargenavn'}.`;
 
       figma.ui.postMessage({
         type: 'css-output',

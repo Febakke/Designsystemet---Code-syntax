@@ -5,6 +5,8 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       padding: 20px;
+      background: var(--figma-color-bg);
+      color: var(--figma-color-text);
     }
     h1 {
       font-size: 20px;
@@ -12,13 +14,13 @@
     }
     p {
       font-size: 16px;
-      color: #666;
+      color: var(--figma-color-text-secondary);
       margin-bottom: 36px;
     }
     button {
-      background: #0062ba;
-      color: white;
-      border: none;
+      background: var(--figma-color-bg-brand);
+      color: var(--figma-color-text-onbrand);
+      border: 1px solid var(--figma-color-border-onbrand);
       padding: 8px 16px;
       border-radius: 4px;
       font-size: 16px;
@@ -26,12 +28,49 @@
       line-height: 24px;
     }
     button:hover {
-      background: #004f96;
+      background: var(--figma-color-bg-brand-hover);
+    }
+    button:disabled {
+      background: var(--figma-color-bg-disabled);
+      color: var(--figma-color-text-disabled);
+      border-color: var(--figma-color-border-disabled);
+      cursor: default;
+    }
+    .options {
+      margin-bottom: 16px;
+    }
+    .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--figma-color-text);
+    }
+    #status {
+      margin-top: 14px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--figma-color-text-secondary);
+    }
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--figma-color-border);
+      border-top-color: var(--figma-color-border-brand-strong);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
     #output {
       margin-top: 20px;
       padding: 16px;
-      background: #F5F5F5;
+      background: var(--figma-color-bg-secondary);
+      color: var(--figma-color-text);
+      border: 1px solid var(--figma-color-border);
       border-radius: 6px;
       font-family: monospace;
       white-space: pre-wrap;
@@ -44,17 +83,40 @@
   <p>Dette er en tredjeparts plugin som kan generere CSS-syntax fra designsystemet. Den vil gå gjennom alle variablene som er tilgjengelig for designere i Figma og lage CSS-syntax som matcher den som designsystemet genererer. 
   </br>  
   </p>
+  <div class="options">
+    <label class="checkbox">
+      <input id="semantic-color-name" type="checkbox">
+      Ta med fargenavn i Semantic
+    </label>
+  </div>
   <button id="generate">Generer CSS-syntax</button>
+  <div id="status">
+    <span class="spinner"></span>
+    <span id="status-text">Genererer CSS-syntax...</span>
+  </div>
   <pre id="output"></pre>
   <script>
-    document.getElementById('generate').onclick = () => {
-      parent.postMessage({ pluginMessage: { type: 'generate-css' } }, '*');
+    const generateButton = document.getElementById('generate');
+    const semanticCheckbox = document.getElementById('semantic-color-name');
+    const status = document.getElementById('status');
+    const statusText = document.getElementById('status-text');
+    const output = document.getElementById('output');
+
+    generateButton.onclick = () => {
+      const useSemanticColorName = semanticCheckbox.checked;
+      const semanticModeText = useSemanticColorName ? 'med fargenavn' : 'uten fargenavn';
+      generateButton.disabled = true;
+      statusText.textContent = `Genererer CSS-syntax (${semanticModeText} i Semantic)...`;
+      status.style.display = 'flex';
+      output.style.display = 'none';
+      parent.postMessage({ pluginMessage: { type: 'generate-css', useSemanticColorName } }, '*');
     };
 
     onmessage = (event) => {
       const msg = event.data.pluginMessage;
       if (msg.type === 'css-output') {
-        const output = document.getElementById('output');
+        generateButton.disabled = false;
+        status.style.display = 'none';
         output.textContent = msg.css;
         output.style.display = 'block';
       }
