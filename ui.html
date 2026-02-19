@@ -118,6 +118,43 @@
       font-size: 12px;
       color: var(--figma-color-text-secondary);
     }
+    .issue-panel {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--figma-color-border-danger);
+      border-radius: 10px;
+      background-color: color-mix(in srgb, var(--figma-color-bg-danger-tertiary) 10%, transparent);
+    }
+    .issue-panel details {
+      font-size: 12px;
+    }
+    .issue-panel summary {
+      cursor: pointer;
+      color: var(--figma-color-text-danger);
+      font-weight: 600;
+    }
+    .issue-table {
+      width: 100%;
+      margin-top: 8px;
+      border-collapse: collapse;
+      font-size: 12px;
+      color: var(--figma-color-text);
+    }
+    .issue-table th,
+    .issue-table td {
+      border: 1px solid var(--figma-color-border);
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    .issue-table th {
+      background: var(--figma-color-bg-secondary);
+      font-weight: 600;
+    }
+    .issue-table th:first-child { 
+      width: 50px; 
+    }
   </style>
 </head>
 <body>
@@ -149,10 +186,24 @@
         <button id="switch-semantic" class="hidden"></button>
     </div>
 
-    
+
   </div>
 
- 
+  <div id="issues-panel" class="issue-panel hidden">
+    <details id="issues-details">
+      <summary id="issues-summary">View issues</summary>
+      <table id="issues-table" class="issue-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Variable</th>
+            <th>Issue</th>
+          </tr>
+        </thead>
+        <tbody id="issues-body"></tbody>
+      </table>
+    </details>
+  </div>
 
   <script>
     const healthButton = document.getElementById('check-health');
@@ -167,6 +218,46 @@
     const syntaxTag = document.getElementById('syntax-tag');
     const semanticModeTag = document.getElementById('semantic-mode-tag');
     const scopeTag = document.getElementById('scope-tag');
+    const issuesPanel = document.getElementById('issues-panel');
+    const issuesDetails = document.getElementById('issues-details');
+    const issuesSummary = document.getElementById('issues-summary');
+    const issuesBody = document.getElementById('issues-body');
+
+    function renderIssues(issueLines) {
+      issuesBody.textContent = '';
+      const parsedIssues = issueLines.map((issue) => {
+        const match = issue.match(/^\[(Scope|Syntax)\]\s(.+?)\s\|\s(.+)$/);
+        return {
+          type: match ? match[1] : 'Unknown',
+          variable: match ? match[2] : issue,
+          details: match ? match[3] : issue
+        };
+      });
+
+      parsedIssues.sort((a, b) => {
+        const priority = { Scope: 0, Syntax: 1, Unknown: 2 };
+        const typeDiff = (priority[a.type] ?? 3) - (priority[b.type] ?? 3);
+        if (typeDiff !== 0) return typeDiff;
+        return a.variable.localeCompare(b.variable);
+      });
+
+      parsedIssues.forEach(({ type, variable, details }) => {
+
+        const row = document.createElement('tr');
+        const typeCell = document.createElement('td');
+        const variableCell = document.createElement('td');
+        const detailsCell = document.createElement('td');
+
+        typeCell.textContent = type;
+        variableCell.textContent = variable;
+        detailsCell.textContent = details;
+
+        row.appendChild(typeCell);
+        row.appendChild(variableCell);
+        row.appendChild(detailsCell);
+        issuesBody.appendChild(row);
+      });
+    }
 
     function setBusy(isBusy) {
       healthButton.disabled = isBusy;
@@ -217,6 +308,17 @@
       summaryLine.textContent = !hasScopeIssues && !hasSyntaxIssues
         ? 'All checks passed.'
         : 'Issues found. Use the actions below.';
+
+      const hasErrors = hasScopeIssues || hasSyntaxIssues;
+      const issueLines = Array.isArray(health.issues) ? health.issues : [];
+      issuesPanel.classList.toggle('hidden', !hasErrors);
+      if (hasErrors) {
+        renderIssues(issueLines);
+        issuesSummary.textContent = `View ${issueLines.length} issue(s)`;
+      } else {
+        issuesDetails.open = false;
+        issuesBody.textContent = '';
+      }
 
       const canSwitch = (health.semanticDetected === 'with' || health.semanticDetected === 'without') && !hasSyntaxIssues;
       switchButton.classList.toggle('hidden', !canSwitch);

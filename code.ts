@@ -1,4 +1,4 @@
-figma.showUI(__html__, { themeColors: true, width: 400, height: 400 });
+figma.showUI(__html__, { themeColors: true, width: 500, height: 400 });
 
 type PluginAction = 'generate-syntax' | 'generate-scopes' | 'check-health';
 type SemanticMode = 'with' | 'without' | 'mixed' | 'unknown';
@@ -11,6 +11,7 @@ type HealthSummary = {
   scopesChecked: number;
   semanticDetected: SemanticMode;
   primarySemanticMode: 'with' | 'without';
+  issues: string[];
 };
 
 const syntaxCollections = ['Main color', 'Semantic', 'Support color', 'Size', 'Theme'];
@@ -320,7 +321,8 @@ figma.ui.onmessage = async (msg) => {
           syntaxChecked: checkedSyntax,
           scopesChecked: checkedScopes,
           semanticDetected,
-          primarySemanticMode: semanticModeForCheck
+          primarySemanticMode: semanticModeForCheck,
+          issues
         }
       : undefined;
 
