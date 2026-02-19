@@ -1,6 +1,20 @@
 figma.showUI(__html__, { themeColors: true, width: 400, height: 400 });
 
-type PluginAction = 'generate-syntax' | 'generate-scopes';
+type PluginAction = 'generate-syntax' | 'generate-scopes' | 'check-health';
+type SemanticMode = 'with' | 'without' | 'mixed' | 'unknown';
+
+type HealthSummary = {
+  scopeMismatch: number;
+  syntaxMissing: number;
+  syntaxMismatch: number;
+  syntaxChecked: number;
+  scopesChecked: number;
+  semanticDetected: SemanticMode;
+  primarySemanticMode: 'with' | 'without';
+};
+
+const syntaxCollections = ['Main color', 'Semantic', 'Support color', 'Size', 'Theme'];
+const scopeCollections = [...syntaxCollections, 'Color scheme', 'Typography'];
 
 function getFormattedName(variable: Variable) {
   const fullName = variable.name.toLowerCase();
@@ -15,7 +29,7 @@ function getScopes(
 ): VariableScope[] {
   if (resolvedType === 'COLOR') {
     if (collectionName === 'Semantic' || collectionName === 'Main color' || collectionName === 'Support color') {
-      return ['ALL_SCOPES'];
+      return ['ALL_FILLS', 'STROKE_COLOR'];
     }
     return [];
   }
@@ -43,8 +57,73 @@ function getScopes(
   return [];
 }
 
+function getExpectedSyntax(
+  collectionName: string,
+  resolvedType: VariableResolvedDataType,
+  fullName: string,
+  name: string,
+  useSemanticColorName: boolean
+): string | null {
+  if (resolvedType === 'COLOR' && collectionName !== 'Theme') {
+    if (fullName === 'link/color/visited') {
+      return 'var(--ds-link-color-visited)';
+    }
+    if (fullName.includes('focus/inner')) {
+      return 'var(--ds-color-focus-inner)';
+    }
+    if (fullName.includes('focus/outer')) {
+      return 'var(--ds-color-focus-outer)';
+    }
+    if (collectionName === 'Semantic') {
+      const [, colorName, ...rest] = fullName.split('/');
+      const semanticParts = useSemanticColorName
+        ? [colorName, ...rest].filter(Boolean)
+        : rest.filter(Boolean);
+      const semanticName = semanticParts.join('-') || name;
+      return `var(--ds-color-${semanticName})`;
+    }
+    return `var(--ds-color-${name})`;
+  }
+
+  if (resolvedType === 'FLOAT' && collectionName !== 'Theme') {
+    if (fullName.startsWith('_size/')) return null;
+
+    if (fullName.includes('font-size/')) {
+      return `var(--ds-font-size-${name})`;
+    }
+    if (fullName.includes('border-radius')) {
+      return `var(--ds-border-radius-${name})`;
+    }
+    if (fullName.includes('border-width')) {
+      return `var(--ds-border-width-${name})`;
+    }
+    if (fullName.includes('opacity')) {
+      return `var(--ds-opacity-${name})`;
+    }
+    if (fullName.includes('size/')) {
+      return `var(--ds-size-${name})`;
+    }
+    return `var(--ds-${collectionName.toLowerCase()}-${name})`;
+  }
+
+  if (collectionName === 'Theme' && resolvedType === 'STRING') {
+    if (fullName.includes('font-weight/')) {
+      return `var(--ds-font-weight-${name})`;
+    }
+    if (fullName === 'font-family') {
+      return 'var(--ds-font-family)';
+    }
+  }
+
+  return null;
+}
+
+function normalizeScopes(scopes: readonly VariableScope[]): string {
+  return [...scopes].sort().join('|');
+}
+
 figma.ui.onmessage = async (msg) => {
-  if (msg.type !== 'generate-syntax' && msg.type !== 'generate-scopes') {
+  if (msg.type !== 'generate-syntax' && msg.type !== 'generate-scopes' && msg.type !== 'check-health') {
     return;
   }
 
@@ -52,34 +131,86 @@ figma.ui.onmessage = async (msg) => {
     const action = msg.type as PluginAction;
     const useSemanticColorName = Boolean(msg.useSemanticColorName);
     const collections = await figma.variables.getLocalVariableCollectionsAsync();
-    const syntaxCollections = ['Main color', 'Semantic', 'Support color', 'Size', 'Theme'];
-    const scopeCollections = [...syntaxCollections, 'Color scheme', 'Typography'];
-    const requiredCollections = action === 'generate-scopes' ? scopeCollections : syntaxCollections;
+    const requiredCollections = action === 'generate-syntax' ? syntaxCollections : scopeCollections;
     const targetCollections = collections.filter(c => requiredCollections.some(name => name === c.name));
 
-   let output = 'All collectons found';
-   /*  targetCollections.forEach(c => output += `- ${c.name}\n`);*/
+    let output = '';
+    const appendOutputLine = (line: string) => {
+      output += output ? `\n${line}` : line;
+    };
 
     const missingCollections = requiredCollections.filter(name =>
       !collections.some(c => c.name === name)
     );
 
     if (missingCollections.length > 0) {
-      output += '\nAdvarsel: Følgende collections mangler:\n';
-      missingCollections.forEach(name => output += `- ${name}\n`);
+      appendOutputLine('Warning: The following collections are missing:');
+      missingCollections.forEach(name => appendOutputLine(`- ${name}`));
     }
 
     if (targetCollections.length === 0) {
-      output += '\nIngen relevante collections funnet.';
-      figma.ui.postMessage({ type: 'css-output', css: output });
+      appendOutputLine('No relevant collections found.');
+      figma.ui.postMessage({ type: 'action-result', action, output });
       return;
     }
+    
 
     let updatedCount = 0;
     let scopedCount = 0;
     let noScopeCount = 0;
 
+    let checkedSyntax = 0;
+    let syntaxOk = 0;
+    let syntaxMissing = 0;
+    let syntaxMismatch = 0;
+    let checkedScopes = 0;
+    let scopeOk = 0;
+    let scopeMismatch = 0;
+    const issues: string[] = [];
+
     const allVariables = await figma.variables.getLocalVariablesAsync();
+    let semanticModeForCheck: 'with' | 'without' = useSemanticColorName ? 'with' : 'without';
+    let semanticDetected: SemanticMode = 'unknown';
+    let semanticModeDetection = '';
+
+    if (action === 'check-health') {
+      let withColorNameHits = 0;
+      let withoutColorNameHits = 0;
+
+      for (const collection of targetCollections) {
+        if (collection.name !== 'Semantic') continue;
+        const variables = allVariables.filter(v => v.variableCollectionId === collection.id);
+
+        for (const variable of variables) {
+          if (variable.resolvedType !== 'COLOR') continue;
+          const { fullName, name } = getFormattedName(variable);
+          const expectedWithName = getExpectedSyntax('Semantic', variable.resolvedType, fullName, name, true);
+          const expectedWithoutName = getExpectedSyntax('Semantic', variable.resolvedType, fullName, name, false);
+          const actualSyntax = (variable.codeSyntax['WEB'] || '').trim();
+
+          if (!expectedWithName || !expectedWithoutName || expectedWithName === expectedWithoutName || !actualSyntax) {
+            continue;
+          }
+
+          if (actualSyntax === expectedWithName) withColorNameHits++;
+          if (actualSyntax === expectedWithoutName) withoutColorNameHits++;
+        }
+      }
+
+      if (withColorNameHits > 0 || withoutColorNameHits > 0) {
+        semanticModeForCheck = withColorNameHits > withoutColorNameHits ? 'with' : 'without';
+        semanticDetected = withColorNameHits > 0 && withoutColorNameHits > 0
+          ? 'mixed'
+          : semanticModeForCheck;
+        semanticModeDetection =
+          withColorNameHits > 0 && withoutColorNameHits > 0
+            ? `Mixed Semantic syntax detected (with: ${withColorNameHits}, without: ${withoutColorNameHits}). Health check will use ${semanticModeForCheck} color name as the primary variant.`
+            : `Semantic syntax detected: ${semanticModeForCheck} color name.`;
+      } else {
+        semanticDetected = 'unknown';
+        semanticModeDetection = `Could not auto-detect Semantic syntax. Health check will use the selected mode: ${useSemanticColorName ? 'with' : 'without'} color name.`;
+      }
+    }
 
     for (const collection of targetCollections) {
       const variables = allVariables.filter(v => v.variableCollectionId === collection.id);
@@ -98,80 +229,113 @@ figma.ui.onmessage = async (msg) => {
           continue;
         }
 
-        if (variable.resolvedType === 'COLOR' && collection.name !== 'Theme') {
-          let codeSyntax = '';
-          if (fullName === 'link/color/visited') {
-            codeSyntax = 'var(--ds-link-color-visited)';
-          } else if (fullName.includes('focus/inner')) {
-            codeSyntax = 'var(--ds-color-focus-inner)';
-          } else if (fullName.includes('focus/outer')) {
-            codeSyntax = 'var(--ds-color-focus-outer)';
-          } else if (collection.name === 'Semantic') {
-            const [, colorName, ...rest] = fullName.split('/');
-            const semanticParts = useSemanticColorName
-              ? [colorName, ...rest].filter(Boolean)
-              : rest.filter(Boolean);
-            const semanticName = semanticParts.join('-') || name;
-            codeSyntax = `var(--ds-color-${semanticName})`;
-          } else {
-            codeSyntax = `var(--ds-color-${name})`;
-          }
+        if (action === 'generate-syntax') {
+          const expectedSyntax = getExpectedSyntax(
+            collection.name,
+            variable.resolvedType,
+            fullName,
+            name,
+            useSemanticColorName
+          );
 
-          variable.setVariableCodeSyntax('WEB', codeSyntax);
-          updatedCount++;
-        } else if (variable.resolvedType === 'FLOAT' && collection.name !== 'Theme') {
-          if (fullName.startsWith('_size/')) continue;
-
-          let codeSyntax = '';
-          if (fullName.includes('font-size/')) {
-            codeSyntax = `var(--ds-font-size-${name})`;
-          } else if (fullName.includes('border-radius')) {
-            codeSyntax = `var(--ds-border-radius-${name})`;
-          } else if (fullName.includes('border-width')) {
-            codeSyntax = `var(--ds-border-width-${name})`;
-          } else if (fullName.includes('opacity')) {
-            codeSyntax = `var(--ds-opacity-${name})`;
-          } else if (fullName.includes('size/')) {
-            codeSyntax = `var(--ds-size-${name})`;
-          } else {
-            codeSyntax = `var(--ds-${collection.name.toLowerCase()}-${name})`;
-          }
-
-          variable.setVariableCodeSyntax('WEB', codeSyntax);
-          updatedCount++;
-        } else if (collection.name === 'Theme' && variable.resolvedType === 'STRING') {
-          let codeSyntax = '';
-          if (fullName.includes('font-weight/')) {
-            codeSyntax = `var(--ds-font-weight-${name})`;
-          } else if (fullName === 'font-family') {
-            codeSyntax = 'var(--ds-font-family)';
-          }
-
-          if (codeSyntax) {
-            variable.setVariableCodeSyntax('WEB', codeSyntax);
+          if (expectedSyntax) {
+            variable.setVariableCodeSyntax('WEB', expectedSyntax);
             updatedCount++;
+          }
+          continue;
+        }
+
+        const expectedScopes = getScopes(collection.name, variable.resolvedType, fullName);
+        const actualScopes = variable.scopes ?? [];
+        checkedScopes++;
+
+        if (normalizeScopes(expectedScopes) === normalizeScopes(actualScopes)) {
+          scopeOk++;
+        } else {
+          scopeMismatch++;
+          if (issues.length < 40) {
+            issues.push(
+              `[Scope] ${collection.name} / ${variable.name} | expected: [${expectedScopes.join(', ')}] | actual: [${actualScopes.join(', ')}]`
+            );
+          }
+        }
+
+        if (syntaxCollections.indexOf(collection.name) === -1) {
+          continue;
+        }
+
+        const expectedSyntax = getExpectedSyntax(
+          collection.name,
+          variable.resolvedType,
+          fullName,
+          name,
+          semanticModeForCheck === 'with'
+        );
+
+        if (!expectedSyntax) {
+          continue;
+        }
+
+        checkedSyntax++;
+        const actualSyntax = variable.codeSyntax['WEB']?.trim() || '';
+
+        if (!actualSyntax) {
+          syntaxMissing++;
+          if (issues.length < 40) {
+            issues.push(`[Syntax] ${collection.name} / ${variable.name} | missing WEB syntax | expected: ${expectedSyntax}`);
+          }
+          continue;
+        }
+
+        if (actualSyntax === expectedSyntax) {
+          syntaxOk++;
+        } else {
+          syntaxMismatch++;
+          if (issues.length < 40) {
+            issues.push(`[Syntax] ${collection.name} / ${variable.name} | expected: ${expectedSyntax} | actual: ${actualSyntax}`);
           }
         }
       }
     }
 
     if (action === 'generate-scopes') {
-      output += `\nOppdaterte scopes på ${scopedCount} variabler.`;
-      output += `\nIngen scopes på ${noScopeCount} variabler.`;
+      appendOutputLine(`Updated scopes on ${scopedCount} variables.`);
+      appendOutputLine(`No scopes on ${noScopeCount} variables.`);
+    } else if (action === 'generate-syntax') {
+      appendOutputLine(`Updated ${updatedCount} variables with the design system CSS syntax.`);
+      appendOutputLine(`Semantic was generated ${useSemanticColorName ? 'with color name' : 'without color name'}.`);
     } else {
-      output += `\nOppdaterte ${updatedCount} variabler med designsystemets CSS syntax.`;
-      output += `\nSemantic ble generert ${useSemanticColorName ? 'med fargenavn' : 'uten fargenavn'}.`;
+      const syntaxIssueCount = syntaxMissing + syntaxMismatch;
+      appendOutputLine('Health check complete.');
+      appendOutputLine(`Semantic mode: ${semanticDetected}.`);
+      appendOutputLine(`Syntax: ${syntaxIssueCount === 0 ? 'OK' : `${syntaxIssueCount} issue(s)`}.`);
+      appendOutputLine(`Scopes: ${scopeMismatch === 0 ? 'OK' : `${scopeMismatch} issue(s)`}.`);
     }
 
+    const health: HealthSummary | undefined = action === 'check-health'
+      ? {
+          scopeMismatch,
+          syntaxMissing,
+          syntaxMismatch,
+          syntaxChecked: checkedSyntax,
+          scopesChecked: checkedScopes,
+          semanticDetected,
+          primarySemanticMode: semanticModeForCheck
+        }
+      : undefined;
+
     figma.ui.postMessage({
-      type: 'css-output',
-      css: output
+      type: 'action-result',
+      action,
+      output,
+      health
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Ukjent feil';
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     figma.ui.postMessage({
-      type: 'css-output',
-      css: `Feil: ${errorMessage}`
+      type: 'action-result',
+      action: 'error',
+      output: `Error: ${errorMessage}`
     });
   }
 };
