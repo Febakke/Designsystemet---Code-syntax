@@ -36,8 +36,18 @@
       border-color: var(--figma-color-border-disabled);
       cursor: default;
     }
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
     .options {
       margin-bottom: 16px;
+      padding: 16px;
+      border: 1px, solid, var(--figma-color-border);
+      border-radius: 12px;
+      display: grid;
+      gap: 12px;
     }
     .checkbox {
       display: flex;
@@ -79,43 +89,57 @@
   </style>
 </head>
 <body>
-  <h1>Designsystemet - CSS Syntax</h1>
-  <p>Dette er en tredjeparts plugin som kan generere CSS-syntax fra designsystemet. Den vil gå gjennom alle variablene som er tilgjengelig for designere i Figma og lage CSS-syntax som matcher den som designsystemet genererer. 
-  </br>  
+  <h1>Designsystemet - CSS and scoping toolkit</h1>
+  <p>Use this set correct scoping and CSS syntax in your version Designsystemets community file
   </p>
   <div class="options">
     <label class="checkbox">
       <input id="semantic-color-name" type="checkbox">
-      Ta med fargenavn i Semantic
+      Add "Color-name" in CSS syntax (Only in semantic collection)
     </label>
+    <button id="generate-syntax">Generer CSS-syntax</button>
   </div>
-  <button id="generate">Generer CSS-syntax</button>
+  <div class="options">
+    
+    <button id="generate-scopes">Sett scopes</button>
+  </div>
   <div id="status">
     <span class="spinner"></span>
     <span id="status-text">Genererer CSS-syntax...</span>
   </div>
   <pre id="output"></pre>
   <script>
-    const generateButton = document.getElementById('generate');
+    const syntaxButton = document.getElementById('generate-syntax');
+    const scopesButton = document.getElementById('generate-scopes');
     const semanticCheckbox = document.getElementById('semantic-color-name');
     const status = document.getElementById('status');
     const statusText = document.getElementById('status-text');
     const output = document.getElementById('output');
 
-    generateButton.onclick = () => {
+    function setBusy(isBusy) {
+      syntaxButton.disabled = isBusy;
+      scopesButton.disabled = isBusy;
+    }
+
+    function runAction(actionType) {
       const useSemanticColorName = semanticCheckbox.checked;
       const semanticModeText = useSemanticColorName ? 'med fargenavn' : 'uten fargenavn';
-      generateButton.disabled = true;
-      statusText.textContent = `Genererer CSS-syntax (${semanticModeText} i Semantic)...`;
+      setBusy(true);
+      statusText.textContent = actionType === 'generate-syntax'
+        ? `Genererer CSS-syntax (${semanticModeText} i Semantic)...`
+        : 'Setter scopes...';
       status.style.display = 'flex';
       output.style.display = 'none';
-      parent.postMessage({ pluginMessage: { type: 'generate-css', useSemanticColorName } }, '*');
-    };
+      parent.postMessage({ pluginMessage: { type: actionType, useSemanticColorName } }, '*');
+    }
+
+    syntaxButton.onclick = () => runAction('generate-syntax');
+    scopesButton.onclick = () => runAction('generate-scopes');
 
     onmessage = (event) => {
       const msg = event.data.pluginMessage;
       if (msg.type === 'css-output') {
-        generateButton.disabled = false;
+        setBusy(false);
         status.style.display = 'none';
         output.textContent = msg.css;
         output.style.display = 'block';

@@ -1,2 +1,64 @@
-## POC Designsystemet code syntax Figma plugin
-En plugin som kun har en oppgave. Legge til code syntax for alle variabler som brukes i Figma. Dette skal gjøre det lettere for utviklere å lese av hvilken variabeler som er brukt i et design. Den er ikke fleksibel og vil kun fungere om du har tatt utgangspunkt i vår token struktur. 
+## Designsystemet - Code syntax (Figma plugin)
+
+En intern plugin for å sette **code syntax** og **variable scopes** på Figma-variabler basert på vår token-struktur.
+
+## Hva pluginen gjør
+
+Pluginen har to handlinger:
+
+1. `Generer CSS-syntax`
+- Setter `variable.setVariableCodeSyntax('WEB', ...)` for utvalgte collections.
+- Har toggle for `Semantic`:
+  - uten fargenavn (default): `var(--ds-color-background-default)`
+  - med fargenavn: `var(--ds-color-neutral-background-default)`
+
+2. `Sett scopes`
+- Setter `variable.scopes` for relevante variabler.
+- Variabler uten match får eksplisitt `[]` (null scope).
+
+## Collections
+
+### Syntax (kun disse)
+- `Main color`
+- `Semantic`
+- `Support color`
+- `Size`
+- `Theme`
+
+### Scopes (disse + ekstra)
+- `Main color`
+- `Semantic`
+- `Support color`
+- `Size`
+- `Theme`
+- `Color scheme`
+- `Typography`
+
+`Color scheme` og `Typography` håndteres kun i scope-kjøring og får default `[]` (null scope).
+
+## Scope-regler
+
+### Color
+- `Semantic` -> `ALL_SCOPES`
+- `Main color` -> `ALL_SCOPES`
+- `Support color` -> `ALL_SCOPES`
+
+### Number (FLOAT)
+- `Size` + `font-size/*` -> `FONT_SIZE`
+- `Semantic` + `opacity` -> `OPACITY`
+- `Semantic` + `border-width` -> `STROKE_FLOAT`
+- `Semantic` + `border-radius` -> `CORNER_RADIUS`
+- `Semantic` + `size/*` -> `GAP`, `WIDTH_HEIGHT`
+
+### String
+- `Theme` + `font-weight/*` -> `FONT_STYLE`
+- `Theme` + `font-family` -> `FONT_FAMILY`
+
+## UI
+- To knapper: `Generer CSS-syntax` og `Sett scopes`
+- Loader/status under kjøring
+- Bruker Figma sine UI CSS variables (`themeColors: true`)
+
+## Viktig
+- Pluginen er laget for vår navnekonvensjon og token-struktur.
+- Avvik i collection-navn eller variabelnavn vil gi færre treff.
