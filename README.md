@@ -1,31 +1,50 @@
-## Designsystemet - Code syntax (Figma plugin)
+## Designsystemet - Code Syntax (Figma Plugin)
 
-En intern plugin for å sette **code syntax** og **variable scopes** på Figma-variabler basert på vår token-struktur.
+Internal plugin for setting variable **CSS code syntax** and **scopes** in Figma based on our token structure.
 
-## Hva pluginen gjør
+## Current Workflow
 
-Pluginen har to handlinger:
+When the plugin opens, it runs a check automatically.
 
-1. `Generer CSS-syntax`
-- Setter `variable.setVariableCodeSyntax('WEB', ...)` for utvalgte collections.
-- Har toggle for `Semantic`:
-  - uten fargenavn (default): `var(--ds-color-background-default)`
-  - med fargenavn: `var(--ds-color-neutral-background-default)`
+UI then shows:
+- Status tags for `Scopes`, `Syntax`, and `Semantic` mode.
+- `Fix Scopes` button only when scope issues exist.
+- `Fix CSS Syntax` button only when syntax issues exist.
+- `Switch Semantic ...` button only when syntax is already correct and semantic mode can be detected.
 
-2. `Sett scopes`
-- Setter `variable.scopes` for relevante variabler.
-- Variabler uten match får eksplisitt `[]` (null scope).
+## UI Text Reference
 
-## Collections
+- `Running check...`: plugin is validating current variables.
+- `Applying update...`: plugin is writing scope/syntax updates.
+- `All checks passed.`: no action needed.
+- `Issues found. Use the actions below.`: one or more fixes are available.
+- `Scopes: OK` / `Scopes: N issue(s)`: scope validation result.
+- `Syntax: OK` / `Syntax: N issue(s)`: syntax validation result.
+- `Semantic: with color name` / `without color name` / `mixed`: detected semantic naming variant.
 
-### Syntax
+## Actions
+
+### `Fix Scopes`
+Sets `variable.scopes` according to the rules below.
+
+### `Fix CSS Syntax`
+Sets `variable.setVariableCodeSyntax('WEB', ...)`.
+Default behavior is **without color name** in `Semantic`.
+
+### `Switch Semantic to WITH/WITHOUT Color Name`
+Available only when syntax is currently valid.
+Applies syntax in the opposite semantic variant.
+
+## Collections Used
+
+### Syntax check/fix
 - `Main color`
 - `Semantic`
 - `Support color`
 - `Size`
 - `Theme`
 
-### Scopes
+### Scope check/fix
 - `Main color`
 - `Semantic`
 - `Support color`
@@ -34,16 +53,16 @@ Pluginen har to handlinger:
 - `Color scheme`
 - `Typography`
 
-`Color scheme` og `Typography` håndteres kun i scope-kjøring og får default `[]` (null scope).
+`Color scheme` and `Typography` are scope-only and default to `[]` unless a rule matches.
 
-## Scope-regler
+## Scope Rules
 
 ### Color
-- `Semantic` -> `ALL_SCOPES`
-- `Main color` -> `ALL_SCOPES`
-- `Support color` -> `ALL_SCOPES`
+- `Semantic` -> `ALL_FILLS`, `STROKE_COLOR`
+- `Main color` -> `ALL_FILLS`, `STROKE_COLOR`
+- `Support color` -> `ALL_FILLS`, `STROKE_COLOR`
 
-### Number (FLOAT)
+### Number (`FLOAT`)
 - `Size` + `font-size/*` -> `FONT_SIZE`
 - `Semantic` + `opacity` -> `OPACITY`
 - `Semantic` + `border-width` -> `STROKE_FLOAT`
@@ -54,6 +73,7 @@ Pluginen har to handlinger:
 - `Theme` + `font-weight/*` -> `FONT_STYLE`
 - `Theme` + `font-family` -> `FONT_FAMILY`
 
-## Viktig
-- Pluginen er laget for vår navnekonvensjon og token-struktur.
-- Avvik i collection-navn eller variabelnavn vil gi færre treff.
+## Notes
+
+- Built for our naming conventions and collection names.
+- If names/structure differ, detection and fixes may be incomplete.

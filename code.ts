@@ -204,11 +204,11 @@ figma.ui.onmessage = async (msg) => {
           : semanticModeForCheck;
         semanticModeDetection =
           withColorNameHits > 0 && withoutColorNameHits > 0
-            ? `Mixed Semantic syntax detected (with: ${withColorNameHits}, without: ${withoutColorNameHits}). Health check will use ${semanticModeForCheck} color name as the primary variant.`
+            ? `Mixed Semantic syntax detected (with: ${withColorNameHits}, without: ${withoutColorNameHits}). Check will use ${semanticModeForCheck} color name as the primary variant.`
             : `Semantic syntax detected: ${semanticModeForCheck} color name.`;
       } else {
         semanticDetected = 'unknown';
-        semanticModeDetection = `Could not auto-detect Semantic syntax. Health check will use the selected mode: ${useSemanticColorName ? 'with' : 'without'} color name.`;
+        semanticModeDetection = `Could not auto-detect Semantic syntax. Check will use the selected mode: ${useSemanticColorName ? 'with' : 'without'} color name.`;
       }
     }
 
@@ -306,7 +306,7 @@ figma.ui.onmessage = async (msg) => {
       appendOutputLine(`Semantic was generated ${useSemanticColorName ? 'with color name' : 'without color name'}.`);
     } else {
       const syntaxIssueCount = syntaxMissing + syntaxMismatch;
-      appendOutputLine('Health check complete.');
+      appendOutputLine('Check complete.');
       appendOutputLine(`Semantic mode: ${semanticDetected}.`);
       appendOutputLine(`Syntax: ${syntaxIssueCount === 0 ? 'OK' : `${syntaxIssueCount} issue(s)`}.`);
       appendOutputLine(`Scopes: ${scopeMismatch === 0 ? 'OK' : `${scopeMismatch} issue(s)`}.`);

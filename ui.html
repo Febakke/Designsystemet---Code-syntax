@@ -75,9 +75,9 @@
       color: var(--figma-color-text-danger);
     }
     button {
-      background: var(--figma-color-bg-brand);
-      color: var(--figma-color-text-onbrand);
-      border: 1px solid var(--figma-color-border-onbrand);
+      background: var(--figma-color-bg);
+      color: var(--figma-color-text);
+      border: 1px solid var(--figma-color-border-brand);
       padding: 8px 12px;
       border-radius: 6px;
       font-size: 13px;
@@ -86,7 +86,8 @@
       width: 100%;
     }
     button:hover {
-      background: var(--figma-color-bg-brand-hover);
+      background: var(--figma-color-bg-hover);
+      border: 1px solid var(--figma-color-border-brand-strong);
     }
     button:disabled {
       background: var(--figma-color-bg-disabled);
@@ -94,15 +95,6 @@
       border-color: var(--figma-color-border-disabled);
       cursor: default;
       opacity: 0.55;
-    }
-    button.secondary {
-      background: var(--figma-color-bg-tertiary);
-      color: var(--figma-color-text);
-      border: 1px solid var(--figma-color-border);
-      opacity: 0.86;
-    }
-    button.secondary:hover {
-      background: var(--figma-color-bg-tertiary-hover);
     }
     button.icon {
       width: 32px;
@@ -132,16 +124,16 @@
   <h1>Designsystemet - CSS and Scoping Toolkit</h1>
 
   <div class="topbar">
-    <p id="summary-line">Running health check...</p>
+    <p id="summary-line">Running Check...</p>
     <p id="feedback-line" class="hidden"></p>
-    <button id="check-health" class="secondary icon" aria-label="Rerun health check" title="Rerun health check">↻</button>
+    <button id="check-health" class="icon" aria-label="Rerun check" title="Rerun check">↻</button>
   </div>
 
   <div class="panel">
     <div id="scope-row" class="check-row hidden">
       <span id="scope-tag" class="tag">Scopes</span>
       
-        <button id="generate-scopes" class="secondary">Fix Scopes</button>
+        <button id="generate-scopes">Fix Scopes</button>
       
     </div>
   </div>
@@ -153,8 +145,8 @@
         <span id="semantic-mode-tag" class="tag hidden">Semantic</span>
       </div>
       
-        <button id="generate-syntax" class="secondary">Fix CSS Syntax</button>
-        <button id="switch-semantic" class="secondary hidden"></button>
+        <button id="generate-syntax">Fix CSS Syntax</button>
+        <button id="switch-semantic" class="hidden"></button>
     </div>
 
     
@@ -186,7 +178,7 @@
     function runAction(actionType) {
       setBusy(true);
       summaryLine.textContent = actionType === 'check-health'
-        ? 'Running health check...'
+        ? 'Running check...'
         : 'Applying update...';
       parent.postMessage({ pluginMessage: { type: actionType } }, '*');
     }
