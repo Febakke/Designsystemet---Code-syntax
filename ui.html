@@ -113,11 +113,6 @@
       font-size: 12px;
       color: var(--figma-color-text-secondary);
     }
-    #feedback-line {
-      margin: 0;
-      font-size: 12px;
-      color: var(--figma-color-text-secondary);
-    }
     .issue-panel {
       margin-top: 12px;
       padding: 10px 12px;
@@ -161,8 +156,7 @@
   <h1>Designsystemet - CSS and Scoping Toolkit</h1>
 
   <div class="topbar">
-    <p id="summary-line">Running Check...</p>
-    <p id="feedback-line" class="hidden"></p>
+    <p id="summary-line">Running check...</p>
     <button id="check-health" class="icon" aria-label="Rerun check" title="Rerun check">↻</button>
   </div>
 
@@ -214,7 +208,6 @@
     const scopeRow = document.getElementById('scope-row');
     const syntaxRow = document.getElementById('syntax-row');
     const summaryLine = document.getElementById('summary-line');
-    const feedbackLine = document.getElementById('feedback-line');
     const syntaxTag = document.getElementById('syntax-tag');
     const semanticModeTag = document.getElementById('semantic-mode-tag');
     const scopeTag = document.getElementById('scope-tag');
@@ -351,12 +344,9 @@
       setBusy(false);
       if (msg.action === 'check-health' && msg.health) {
         applyHealthSummary(msg.health);
-        feedbackLine.classList.add('hidden');
       }
 
       if (msg.action === 'generate-syntax' || msg.action === 'generate-scopes') {
-        feedbackLine.textContent = msg.output || '';
-        feedbackLine.classList.remove('hidden');
         runAction('check-health');
       }
     };

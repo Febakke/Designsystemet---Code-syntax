@@ -161,18 +161,15 @@ figma.ui.onmessage = async (msg) => {
     let noScopeCount = 0;
 
     let checkedSyntax = 0;
-    let syntaxOk = 0;
     let syntaxMissing = 0;
     let syntaxMismatch = 0;
     let checkedScopes = 0;
-    let scopeOk = 0;
     let scopeMismatch = 0;
     const issues: string[] = [];
 
     const allVariables = await figma.variables.getLocalVariablesAsync();
     let semanticModeForCheck: 'with' | 'without' = useSemanticColorName ? 'with' : 'without';
     let semanticDetected: SemanticMode = 'unknown';
-    let semanticModeDetection = '';
 
     if (action === 'check-health') {
       let withColorNameHits = 0;
@@ -203,13 +200,8 @@ figma.ui.onmessage = async (msg) => {
         semanticDetected = withColorNameHits > 0 && withoutColorNameHits > 0
           ? 'mixed'
           : semanticModeForCheck;
-        semanticModeDetection =
-          withColorNameHits > 0 && withoutColorNameHits > 0
-            ? `Mixed Semantic syntax detected (with: ${withColorNameHits}, without: ${withoutColorNameHits}). Check will use ${semanticModeForCheck} color name as the primary variant.`
-            : `Semantic syntax detected: ${semanticModeForCheck} color name.`;
       } else {
         semanticDetected = 'unknown';
-        semanticModeDetection = `Could not auto-detect Semantic syntax. Check will use the selected mode: ${useSemanticColorName ? 'with' : 'without'} color name.`;
       }
     }
 
@@ -251,7 +243,6 @@ figma.ui.onmessage = async (msg) => {
         checkedScopes++;
 
         if (normalizeScopes(expectedScopes) === normalizeScopes(actualScopes)) {
-          scopeOk++;
         } else {
           scopeMismatch++;
           if (issues.length < 40) {
@@ -289,7 +280,6 @@ figma.ui.onmessage = async (msg) => {
         }
 
         if (actualSyntax === expectedSyntax) {
-          syntaxOk++;
         } else {
           syntaxMismatch++;
           if (issues.length < 40) {
