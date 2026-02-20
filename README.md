@@ -11,6 +11,10 @@ UI then shows:
 - `Fix Scopes` button only when scope issues exist.
 - `Fix CSS Syntax` button only when syntax issues exist.
 - Semantic switch button only when syntax is already correct and semantic mode can be detected.
+- Error details accordion only when issues exist, with a table:
+  - `Type` (`Scope` / `Syntax`)
+  - `Variable`
+  - `Issue`
 
 ## UI Text Reference
 
@@ -26,6 +30,10 @@ UI then shows:
 
 ### `Fix Scopes`
 Sets `variable.scopes` according to the rules below.
+Result text:
+- `Scopes changed on X variables.`
+- `Scopes already correct on Y variables.`
+- `Z variables end with no scope.`
 
 ### `Fix CSS Syntax`
 Sets `variable.setVariableCodeSyntax('WEB', ...)`.
@@ -35,8 +43,8 @@ Default behavior is **without color name** in `Semantic`.
 Available only when syntax is currently valid.
 Applies syntax in the opposite semantic variant.
 UI labels:
-- `Add Color name to semantic`
-- `Remove color name from semantic`
+- `Add Color name to semantic colors`
+- `Remove color name from semantic colors`
 
 ## Collections Used
 

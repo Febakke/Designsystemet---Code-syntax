@@ -2,6 +2,13 @@ figma.showUI(__html__, { themeColors: true, width: 500, height: 400 });
 
 type PluginAction = 'generate-syntax' | 'generate-scopes' | 'check-health';
 type SemanticMode = 'with' | 'without' | 'mixed' | 'unknown';
+type HealthIssueType = 'Scope' | 'Syntax';
+
+type HealthIssue = {
+  type: HealthIssueType;
+  variable: string;
+  issue: string;
+};
 
 type HealthSummary = {
   scopeMismatch: number;
@@ -12,6 +19,7 @@ type HealthSummary = {
   semanticDetected: SemanticMode;
   primarySemanticMode: 'with' | 'without';
   issues: string[];
+  issueRows: HealthIssue[];
 };
 
 const syntaxCollections = ['Main color', 'Semantic', 'Support color', 'Size', 'Theme'];
@@ -157,7 +165,8 @@ figma.ui.onmessage = async (msg) => {
     
 
     let updatedCount = 0;
-    let scopedCount = 0;
+    let scopeChangedCount = 0;
+    let scopeUnchangedCount = 0;
     let noScopeCount = 0;
 
     let checkedSyntax = 0;
@@ -166,8 +175,19 @@ figma.ui.onmessage = async (msg) => {
     let checkedScopes = 0;
     let scopeMismatch = 0;
     const issues: string[] = [];
+    const issueRows: HealthIssue[] = [];
 
     const allVariables = await figma.variables.getLocalVariablesAsync();
+    const variablesByCollectionId = new Map<string, Variable[]>();
+    for (const variable of allVariables) {
+      const existing = variablesByCollectionId.get(variable.variableCollectionId);
+      if (existing) {
+        existing.push(variable);
+      } else {
+        variablesByCollectionId.set(variable.variableCollectionId, [variable]);
+      }
+    }
+
     let semanticModeForCheck: 'with' | 'without' = useSemanticColorName ? 'with' : 'without';
     let semanticDetected: SemanticMode = 'unknown';
 
@@ -177,7 +197,7 @@ figma.ui.onmessage = async (msg) => {
 
       for (const collection of targetCollections) {
         if (collection.name !== 'Semantic') continue;
-        const variables = allVariables.filter(v => v.variableCollectionId === collection.id);
+        const variables = variablesByCollectionId.get(collection.id) ?? [];
 
         for (const variable of variables) {
           if (variable.resolvedType !== 'COLOR') continue;
@@ -206,16 +226,23 @@ figma.ui.onmessage = async (msg) => {
     }
 
     for (const collection of targetCollections) {
-      const variables = allVariables.filter(v => v.variableCollectionId === collection.id);
+      const variables = variablesByCollectionId.get(collection.id) ?? [];
 
       for (const variable of variables) {
         const { fullName, name } = getFormattedName(variable);
 
         if (action === 'generate-scopes') {
           const scopes = getScopes(collection.name, variable.resolvedType, fullName);
-          variable.scopes = scopes;
+          const actualScopes = variable.scopes ?? [];
+          const hasScopeChange = normalizeScopes(scopes) !== normalizeScopes(actualScopes);
+          if (hasScopeChange) {
+            variable.scopes = scopes;
+            scopeChangedCount++;
+          } else {
+            scopeUnchangedCount++;
+          }
+
           if (scopes.length > 0) {
-            scopedCount++;
           } else {
             noScopeCount++;
           }
@@ -245,7 +272,12 @@ figma.ui.onmessage = async (msg) => {
         if (normalizeScopes(expectedScopes) === normalizeScopes(actualScopes)) {
         } else {
           scopeMismatch++;
-          if (issues.length < 40) {
+          if (issueRows.length < 40) {
+            issueRows.push({
+              type: 'Scope',
+              variable: `${collection.name} / ${variable.name}`,
+              issue: `expected: [${expectedScopes.join(', ')}] | actual: [${actualScopes.join(', ')}]`
+            });
             issues.push(
               `[Scope] ${collection.name} / ${variable.name} | expected: [${expectedScopes.join(', ')}] | actual: [${actualScopes.join(', ')}]`
             );
@@ -273,7 +305,12 @@ figma.ui.onmessage = async (msg) => {
 
         if (!actualSyntax) {
           syntaxMissing++;
-          if (issues.length < 40) {
+          if (issueRows.length < 40) {
+            issueRows.push({
+              type: 'Syntax',
+              variable: `${collection.name} / ${variable.name}`,
+              issue: `missing WEB syntax | expected: ${expectedSyntax}`
+            });
             issues.push(`[Syntax] ${collection.name} / ${variable.name} | missing WEB syntax | expected: ${expectedSyntax}`);
           }
           continue;
@@ -282,7 +319,12 @@ figma.ui.onmessage = async (msg) => {
         if (actualSyntax === expectedSyntax) {
         } else {
           syntaxMismatch++;
-          if (issues.length < 40) {
+          if (issueRows.length < 40) {
+            issueRows.push({
+              type: 'Syntax',
+              variable: `${collection.name} / ${variable.name}`,
+              issue: `expected: ${expectedSyntax} | actual: ${actualSyntax}`
+            });
             issues.push(`[Syntax] ${collection.name} / ${variable.name} | expected: ${expectedSyntax} | actual: ${actualSyntax}`);
           }
         }
@@ -290,8 +332,9 @@ figma.ui.onmessage = async (msg) => {
     }
 
     if (action === 'generate-scopes') {
-      appendOutputLine(`Updated scopes on ${scopedCount} variables.`);
-      appendOutputLine(`No scopes on ${noScopeCount} variables.`);
+      appendOutputLine(`Scopes changed on ${scopeChangedCount} variables.`);
+      appendOutputLine(`Scopes already correct on ${scopeUnchangedCount} variables.`);
+      appendOutputLine(`${noScopeCount} variables end with no scope.`);
     } else if (action === 'generate-syntax') {
       appendOutputLine(`Updated ${updatedCount} variables with the design system CSS syntax.`);
       appendOutputLine(`Semantic was generated ${useSemanticColorName ? 'with color name' : 'without color name'}.`);
@@ -312,7 +355,8 @@ figma.ui.onmessage = async (msg) => {
           scopesChecked: checkedScopes,
           semanticDetected,
           primarySemanticMode: semanticModeForCheck,
-          issues
+          issues,
+          issueRows
         }
       : undefined;
 

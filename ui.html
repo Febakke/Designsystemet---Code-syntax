@@ -216,25 +216,17 @@
     const issuesSummary = document.getElementById('issues-summary');
     const issuesBody = document.getElementById('issues-body');
 
-    function renderIssues(issueLines) {
+    function renderIssues(issueRows) {
       issuesBody.textContent = '';
-      const parsedIssues = issueLines.map((issue) => {
-        const match = issue.match(/^\[(Scope|Syntax)\]\s(.+?)\s\|\s(.+)$/);
-        return {
-          type: match ? match[1] : 'Unknown',
-          variable: match ? match[2] : issue,
-          details: match ? match[3] : issue
-        };
-      });
 
-      parsedIssues.sort((a, b) => {
+      const sortedRows = [...issueRows].sort((a, b) => {
         const priority = { Scope: 0, Syntax: 1, Unknown: 2 };
         const typeDiff = (priority[a.type] ?? 3) - (priority[b.type] ?? 3);
         if (typeDiff !== 0) return typeDiff;
         return a.variable.localeCompare(b.variable);
       });
 
-      parsedIssues.forEach(({ type, variable, details }) => {
+      sortedRows.forEach(({ type, variable, issue }) => {
 
         const row = document.createElement('tr');
         const typeCell = document.createElement('td');
@@ -243,7 +235,7 @@
 
         typeCell.textContent = type;
         variableCell.textContent = variable;
-        detailsCell.textContent = details;
+        detailsCell.textContent = issue;
 
         row.appendChild(typeCell);
         row.appendChild(variableCell);
@@ -303,11 +295,21 @@
         : 'Issues found. Use the actions below.';
 
       const hasErrors = hasScopeIssues || hasSyntaxIssues;
-      const issueLines = Array.isArray(health.issues) ? health.issues : [];
+      let issueRows = Array.isArray(health.issueRows) ? health.issueRows : [];
+      if (issueRows.length === 0 && Array.isArray(health.issues)) {
+        issueRows = health.issues.map((issue) => {
+          const match = issue.match(/^\[(Scope|Syntax)\]\s(.+?)\s\|\s(.+)$/);
+          return {
+            type: match ? match[1] : 'Unknown',
+            variable: match ? match[2] : issue,
+            issue: match ? match[3] : issue
+          };
+        });
+      }
       issuesPanel.classList.toggle('hidden', !hasErrors);
       if (hasErrors) {
-        renderIssues(issueLines);
-        issuesSummary.textContent = `View ${issueLines.length} issue(s)`;
+        renderIssues(issueRows);
+        issuesSummary.textContent = `View ${issueRows.length} issue(s)`;
       } else {
         issuesDetails.open = false;
         issuesBody.textContent = '';
