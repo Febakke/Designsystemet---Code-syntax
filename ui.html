@@ -21,7 +21,7 @@
     .topbar {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-end;
       gap: 10px;
       margin-bottom: 12px;
     }
@@ -108,47 +108,56 @@
       border-radius: 8px;
       opacity: 1;
     }
-    #summary-line {
-      margin: 0;
-      font-size: 12px;
-      color: var(--figma-color-text-secondary);
+    /* Loading state: hide the label and show a centered spinner inside the
+       button that was clicked. The button keeps its normal (non-disabled)
+       colors so it reads as "working", not "unavailable". */
+    button.loading {
+      color: transparent !important;
+      position: relative;
+      pointer-events: none;
     }
-    .issue-panel {
-      margin-top: 12px;
-      padding: 10px 12px;
-      border: 1px solid var(--figma-color-border-warning);
-      border-radius: 10px;
-      background-color: color-mix(in srgb, var(--figma-color-bg-warning-tertiary) 10%, transparent);
+    button.loading::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 14px;
+      height: 14px;
+      margin: -8px 0 0 -8px;
+      border: 2px solid var(--figma-color-text);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
     }
-    .issue-panel details {
-      font-size: 12px;
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
-    .issue-panel summary {
-      cursor: pointer;
-      color: var(--figma-color-text-danger);
-      font-weight: 600;
-    }
-    .issue-table {
-      width: 100%;
-      margin-top: 8px;
-      border-collapse: collapse;
-      font-size: 12px;
-      color: var(--figma-color-text);
-    }
-    .issue-table th,
-    .issue-table td {
+    .state-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 6px;
       border: 1px solid var(--figma-color-border);
-      padding: 6px 8px;
-      text-align: left;
-      vertical-align: top;
-      word-break: break-word;
-    }
-    .issue-table th {
       background: var(--figma-color-bg-secondary);
-      font-weight: 600;
+      color: var(--figma-color-text-secondary);
+      font-size: 11px;
+      line-height: 1.2;
+      white-space: nowrap;
     }
-    .issue-table th:first-child { 
-      width: 50px; 
+    .banner {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--figma-color-border);
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--figma-color-text-secondary);
+      white-space: pre-line;
+    }
+    .banner.warning {
+      border-color: var(--figma-color-border-warning);
+      color: var(--figma-color-text-warning);
+      background: color-mix(in srgb, var(--figma-color-bg-warning-tertiary) 14%, transparent);
     }
   </style>
 </head>
@@ -156,106 +165,112 @@
   <h1>Designsystemet - CSS and Scoping Toolkit</h1>
 
   <div class="topbar">
-    <p id="summary-line">Running check...</p>
+    <span id="state-tag" class="state-tag hidden"></span>
     <button id="check-health" class="icon" aria-label="Rerun check" title="Rerun check">↻</button>
   </div>
 
-  <div class="panel">
+  <div id="migration-banner" class="banner hidden"></div>
+
+  <div id="scope-panel" class="panel">
     <div id="scope-row" class="check-row hidden">
       <span id="scope-tag" class="tag">Scopes</span>
-      
+
         <button id="generate-scopes">Fix Scopes</button>
-      
+
     </div>
   </div>
 
-  <div class="panel">
+  <div id="syntax-panel" class="panel">
     <div id="syntax-row" class="check-row hidden">
       <div class="tag-row">
         <span id="syntax-tag" class="tag">Syntax</span>
-        <span id="semantic-mode-tag" class="tag hidden">Semantic</span>
       </div>
-      
+
         <button id="generate-syntax">Fix CSS Syntax</button>
-        <button id="switch-semantic" class="hidden"></button>
     </div>
-
-
-  </div>
-
-  <div id="issues-panel" class="issue-panel hidden">
-    <details id="issues-details">
-      <summary id="issues-summary">View issues</summary>
-      <table id="issues-table" class="issue-table">
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>Variable</th>
-            <th>Issue</th>
-          </tr>
-        </thead>
-        <tbody id="issues-body"></tbody>
-      </table>
-    </details>
   </div>
 
   <script>
     const healthButton = document.getElementById('check-health');
     const scopesButton = document.getElementById('generate-scopes');
     const syntaxButton = document.getElementById('generate-syntax');
-    const switchButton = document.getElementById('switch-semantic');
 
     const scopeRow = document.getElementById('scope-row');
     const syntaxRow = document.getElementById('syntax-row');
-    const summaryLine = document.getElementById('summary-line');
+    const scopePanel = document.getElementById('scope-panel');
+    const syntaxPanel = document.getElementById('syntax-panel');
+    const stateTag = document.getElementById('state-tag');
+    const migrationBanner = document.getElementById('migration-banner');
     const syntaxTag = document.getElementById('syntax-tag');
-    const semanticModeTag = document.getElementById('semantic-mode-tag');
     const scopeTag = document.getElementById('scope-tag');
-    const issuesPanel = document.getElementById('issues-panel');
-    const issuesDetails = document.getElementById('issues-details');
-    const issuesSummary = document.getElementById('issues-summary');
-    const issuesBody = document.getElementById('issues-body');
 
-    function renderIssues(issueRows) {
-      issuesBody.textContent = '';
+    const actionButtons = [healthButton, scopesButton, syntaxButton];
 
-      const sortedRows = [...issueRows].sort((a, b) => {
-        const priority = { Scope: 0, Syntax: 1, Unknown: 2 };
-        const typeDiff = (priority[a.type] ?? 3) - (priority[b.type] ?? 3);
-        if (typeDiff !== 0) return typeDiff;
-        return a.variable.localeCompare(b.variable);
-      });
+    // The button currently showing a spinner. A fix click keeps its spinner
+    // through the follow-up re-check, so it is only cleared when the final
+    // check-health result comes back.
+    let spinnerButton = null;
 
-      sortedRows.forEach(({ type, variable, issue }) => {
-
-        const row = document.createElement('tr');
-        const typeCell = document.createElement('td');
-        const variableCell = document.createElement('td');
-        const detailsCell = document.createElement('td');
-
-        typeCell.textContent = type;
-        variableCell.textContent = variable;
-        detailsCell.textContent = issue;
-
-        row.appendChild(typeCell);
-        row.appendChild(variableCell);
-        row.appendChild(detailsCell);
-        issuesBody.appendChild(row);
-      });
+    function startLoading(button) {
+      spinnerButton = button;
+      button.classList.add('loading');
+      // Disable the other buttons so two write operations can't overlap; the
+      // spinner (not a disabled state) shows where the action is happening.
+      actionButtons.forEach((b) => { if (b !== button) b.disabled = true; });
     }
 
-    function setBusy(isBusy) {
-      healthButton.disabled = isBusy;
-      scopesButton.disabled = isBusy;
-      syntaxButton.disabled = isBusy;
-      switchButton.disabled = isBusy;
+    function stopLoading() {
+      if (spinnerButton) {
+        spinnerButton.classList.remove('loading');
+        spinnerButton = null;
+      }
+      healthButton.disabled = false;
+      // The fix buttons' enabled/hidden state is set by applyHealthSummary.
     }
 
-    function runAction(actionType) {
-      setBusy(true);
-      summaryLine.textContent = actionType === 'check-health'
-        ? 'Running check...'
-        : 'Applying update...';
+    function showActionPanels(show) {
+      scopePanel.classList.toggle('hidden', !show);
+      syntaxPanel.classList.toggle('hidden', !show);
+    }
+
+    function showStateTag(state) {
+      if (state === 'pre' || state === 'post') {
+        stateTag.textContent = state === 'post' ? 'Post-migration' : 'Pre-migration';
+        stateTag.classList.remove('hidden');
+      } else if (state === 'half') {
+        stateTag.textContent = 'Mid-migration';
+        stateTag.classList.remove('hidden');
+      } else {
+        stateTag.classList.add('hidden');
+      }
+    }
+
+    function handleMigrationState(state) {
+      showStateTag(state);
+      if (state === 'half') {
+        // Non-blocking: the plugin processes whatever color collections are
+        // present. Show an informational note but keep the actions available.
+        migrationBanner.className = 'banner';
+        migrationBanner.textContent =
+          'This file looks half-migrated (old and new color collections are mixed). The plugin will fix what it finds — finishing the color migration is still recommended.';
+        migrationBanner.classList.remove('hidden');
+        showActionPanels(true);
+        return true;
+      }
+      if (state === 'not-library') {
+        migrationBanner.className = 'banner';
+        migrationBanner.textContent =
+          'No Designsystemet color collections found. Open the library file or a themed sketch file.';
+        migrationBanner.classList.remove('hidden');
+        showActionPanels(false);
+        return false;
+      }
+      migrationBanner.classList.add('hidden');
+      showActionPanels(true);
+      return true;
+    }
+
+    function postAction(actionType) {
       parent.postMessage({ pluginMessage: { type: actionType } }, '*');
     }
 
@@ -272,70 +287,31 @@
       scopeTag.classList.add(hasScopeIssues ? 'error' : 'ok');
       syntaxTag.classList.add(hasSyntaxIssues ? 'error' : 'ok');
 
-      scopeTag.textContent = hasScopeIssues ? `Scopes: ${health.scopeMismatch} issue(s)` : 'Scopes: OK';
-      syntaxTag.textContent = hasSyntaxIssues ? `Syntax: ${syntaxIssueCount} issue(s)` : 'Syntax: OK';
-
-      semanticModeTag.classList.remove('hidden', 'ok', 'error');
-      if (health.semanticDetected === 'with' || health.semanticDetected === 'without') {
-        semanticModeTag.textContent = `Semantic: ${health.semanticDetected} color name`;
-      } else if (health.semanticDetected === 'mixed') {
-        semanticModeTag.textContent = 'Semantic: mixed';
-        semanticModeTag.classList.add('error');
-      } else {
-        semanticModeTag.classList.add('hidden');
-      }
+      scopeTag.textContent = hasScopeIssues
+        ? `${health.scopeMismatch} variables need scope fixes`
+        : 'Scopes correct';
+      syntaxTag.textContent = hasSyntaxIssues
+        ? `${syntaxIssueCount} variables need syntax fixes`
+        : 'Syntax correct';
 
       scopesButton.classList.toggle('hidden', !hasScopeIssues);
       syntaxButton.classList.toggle('hidden', !hasSyntaxIssues);
       scopesButton.disabled = !hasScopeIssues;
       syntaxButton.disabled = !hasSyntaxIssues;
-
-      summaryLine.textContent = !hasScopeIssues && !hasSyntaxIssues
-        ? 'All checks passed.'
-        : 'Issues found. Use the actions below.';
-
-      const hasErrors = hasScopeIssues || hasSyntaxIssues;
-      let issueRows = Array.isArray(health.issueRows) ? health.issueRows : [];
-      if (issueRows.length === 0 && Array.isArray(health.issues)) {
-        issueRows = health.issues.map((issue) => {
-          const match = issue.match(/^\[(Scope|Syntax)\]\s(.+?)\s\|\s(.+)$/);
-          return {
-            type: match ? match[1] : 'Unknown',
-            variable: match ? match[2] : issue,
-            issue: match ? match[3] : issue
-          };
-        });
-      }
-      issuesPanel.classList.toggle('hidden', !hasErrors);
-      if (hasErrors) {
-        renderIssues(issueRows);
-        issuesSummary.textContent = `View ${issueRows.length} issue(s)`;
-      } else {
-        issuesDetails.open = false;
-        issuesBody.textContent = '';
-      }
-
-      const canSwitch = (health.semanticDetected === 'with' || health.semanticDetected === 'without') && !hasSyntaxIssues;
-      switchButton.classList.toggle('hidden', !canSwitch);
-
-      if (canSwitch) {
-        const toWith = health.semanticDetected === 'without';
-        switchButton.textContent = toWith
-          ? 'Add Color name to semantic colors'
-          : 'Remove color name from semantic colors';
-        switchButton.onclick = () => {
-          parent.postMessage({ pluginMessage: { type: 'generate-syntax', useSemanticColorName: toWith } }, '*');
-          setBusy(true);
-          summaryLine.textContent = 'Applying update...';
-        };
-      } else {
-        switchButton.textContent = '';
-      }
     }
 
-    healthButton.onclick = () => runAction('check-health');
-    scopesButton.onclick = () => runAction('generate-scopes');
-    syntaxButton.onclick = () => runAction('generate-syntax');
+    healthButton.onclick = () => {
+      startLoading(healthButton);
+      postAction('check-health');
+    };
+    scopesButton.onclick = () => {
+      startLoading(scopesButton);
+      postAction('generate-scopes');
+    };
+    syntaxButton.onclick = () => {
+      startLoading(syntaxButton);
+      postAction('generate-syntax');
+    };
 
     onmessage = (event) => {
       const msg = event.data.pluginMessage;
@@ -343,17 +319,34 @@
         return;
       }
 
-      setBusy(false);
-      if (msg.action === 'check-health' && msg.health) {
-        applyHealthSummary(msg.health);
+      if (msg.action === 'error') {
+        stopLoading();
+        migrationBanner.classList.add('hidden');
+        return;
       }
 
+      // After a fix, re-run the check while KEEPING the spinner on the fix
+      // button — the operation isn't visibly "done" until the re-check renders.
       if (msg.action === 'generate-syntax' || msg.action === 'generate-scopes') {
-        runAction('check-health');
+        postAction('check-health');
+        return;
+      }
+
+      // check-health result: end of any chain, so clear the spinner.
+      stopLoading();
+
+      const canProceed = handleMigrationState(msg.migrationState);
+      if (!canProceed) {
+        return;
+      }
+
+      if (msg.health) {
+        applyHealthSummary(msg.health);
       }
     };
 
-    runAction('check-health');
+    startLoading(healthButton);
+    postAction('check-health');
   </script>
 </body>
 </html>
