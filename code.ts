@@ -1,4 +1,8 @@
-figma.showUI(__html__, { themeColors: true, width: 500, height: 450 });
+// Width is fixed; height is driven by the UI, which measures its own content
+// and posts a `resize` message (see ui.html). The initial height is just a
+// starting point before the first measurement arrives.
+const PLUGIN_WIDTH = 500;
+figma.showUI(__html__, { themeColors: true, width: PLUGIN_WIDTH, height: 200 });
 
 type PluginAction = 'generate-syntax' | 'generate-scopes' | 'check-health';
 type MigrationState = 'pre' | 'post' | 'half' | 'not-library';
@@ -196,6 +200,12 @@ function normalizeScopes(scopes: readonly VariableScope[]): string {
 }
 
 figma.ui.onmessage = async (msg) => {
+  if (msg.type === 'resize') {
+    const height = Math.max(1, Math.round(Number(msg.height) || 0));
+    figma.ui.resize(PLUGIN_WIDTH, height);
+    return;
+  }
+
   if (msg.type !== 'generate-syntax' && msg.type !== 'generate-scopes' && msg.type !== 'check-health') {
     return;
   }

@@ -8,7 +8,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-figma.showUI(__html__, { themeColors: true, width: 500, height: 450 });
+// Width is fixed; height is driven by the UI, which measures its own content
+// and posts a `resize` message (see ui.html). The initial height is just a
+// starting point before the first measurement arrives.
+const PLUGIN_WIDTH = 500;
+figma.showUI(__html__, { themeColors: true, width: PLUGIN_WIDTH, height: 200 });
 // The color migration (see ../color-migration-helper) reshapes the variables:
 // pre-migration uses a `Main color` and a `Support color` collection, with
 // variables prefixed `color/main/`. Post-migration these fold into a single
@@ -171,6 +175,11 @@ function normalizeScopes(scopes) {
 }
 figma.ui.onmessage = (msg) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d;
+    if (msg.type === 'resize') {
+        const height = Math.max(1, Math.round(Number(msg.height) || 0));
+        figma.ui.resize(PLUGIN_WIDTH, height);
+        return;
+    }
     if (msg.type !== 'generate-syntax' && msg.type !== 'generate-scopes' && msg.type !== 'check-health') {
         return;
     }

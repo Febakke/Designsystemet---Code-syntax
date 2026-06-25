@@ -1,4 +1,4 @@
-## Designsystemet - Code Syntax (Figma Plugin)
+## Designsystemet - Code syntax & scoping (Figma Plugin)
 
 Internal plugin for setting variable **CSS code syntax** and **scopes** in Figma based on our token structure.
 

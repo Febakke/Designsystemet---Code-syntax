@@ -4,26 +4,17 @@
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
       padding: 20px;
       background: var(--figma-color-bg);
       color: var(--figma-color-text);
     }
-    h1 {
-      font-size: 20px;
-      margin: 0 0 8px;
-    }
-    p {
-      font-size: 14px;
-      color: var(--figma-color-text-secondary);
-      margin: 0;
-      line-height: 1.4;
-    }
     .topbar {
       display: flex;
       align-items: center;
-      justify-content: flex-end;
+      justify-content: flex-start;
       gap: 10px;
-      margin-bottom: 12px;
+      margin-bottom: 4px;
     }
     .panel {
       margin-top: 12px;
@@ -96,17 +87,19 @@
       cursor: default;
       opacity: 0.55;
     }
-    button.icon {
-      width: 32px;
-      height: 32px;
-      padding: 0;
+    button.reload {
+      width: auto;
+      padding: 6px 10px;
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      font-size: 16px;
+      gap: 6px;
+      font-size: 12px;
       line-height: 1;
       border-radius: 8px;
       opacity: 1;
+    }
+    button.reload .reload-icon {
+      font-size: 14px;
     }
     /* Loading state: hide the label and show a centered spinner inside the
        button that was clicked. The button keeps its normal (non-disabled)
@@ -162,11 +155,12 @@
   </style>
 </head>
 <body>
-  <h1>Designsystemet - CSS and Scoping Toolkit</h1>
-
   <div class="topbar">
+    <button id="check-health" class="reload" aria-label="Check again" title="Check again">
+      <span class="reload-icon" aria-hidden="true">↻</span>
+      <span>Check again</span>
+    </button>
     <span id="state-tag" class="state-tag hidden"></span>
-    <button id="check-health" class="icon" aria-label="Rerun check" title="Rerun check">↻</button>
   </div>
 
   <div id="migration-banner" class="banner hidden"></div>
@@ -344,6 +338,16 @@
         applyHealthSummary(msg.health);
       }
     };
+
+    // Resize the plugin window to fit its content. body is content-driven
+    // (no fixed height), so its box height reflects whatever panels/banners are
+    // currently shown; ResizeObserver fires on every change, including the
+    // initial render. The plugin code resizes the window to this height.
+    const resizeObserver = new ResizeObserver(() => {
+      const height = Math.ceil(document.body.getBoundingClientRect().height);
+      parent.postMessage({ pluginMessage: { type: 'resize', height } }, '*');
+    });
+    resizeObserver.observe(document.body);
 
     startLoading(healthButton);
     postAction('check-health');
